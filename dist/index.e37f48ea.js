@@ -606,6 +606,8 @@ const controlRecipes = async function() {
         console.log(id);
         if (!id) return;
         (0, _recipeViewDefault.default).renderSpinner();
+        // 0) Update results view to mark selected search result
+        (0, _resultsViewDefault.default).update(_model.getSearchResultsPage());
         // 1) Loading recipe
         await _model.loadRecipe(id);
         // const { recipe } = model.state;
@@ -642,8 +644,16 @@ const controlPagination = function(goToPage) {
     console.log(goToPage);
 };
 // controlRecipes();
+const controlServings = function(newServings) {
+    // Update the recipe servings (in state)
+    _model.updateServings(newServings);
+    // Update the recipe view
+    // recipeView.render(model.state.recipe);
+    (0, _recipeViewDefault.default).update(_model.state.recipe);
+};
 const init = function() {
     (0, _recipeViewDefault.default).addHandlerRender(controlRecipes);
+    (0, _recipeViewDefault.default).addHandlerUpdateServings(controlServings);
     (0, _searchViewDefault.default).addHandlerSearch(controlSearchResults);
     (0, _paginationViewDefault.default).addHandlerClick(controlPagination);
 };
@@ -1969,6 +1979,7 @@ parcelHelpers.export(exports, "state", ()=>state);
 parcelHelpers.export(exports, "loadRecipe", ()=>loadRecipe);
 parcelHelpers.export(exports, "loadSearchResults", ()=>loadSearchResults);
 parcelHelpers.export(exports, "getSearchResultsPage", ()=>getSearchResultsPage);
+parcelHelpers.export(exports, "updateServings", ()=>updateServings);
 var _config = require("./config");
 var _helpers = require("./helpers");
 const state = {
@@ -2031,8 +2042,15 @@ const getSearchResultsPage = function(page = state.search.page) {
     const end = page * state.search.resultsPerPage //9
     ;
     return state.search.results.slice(start, end);
-} // loadSearchResults('pizza'); //Testing function
-;
+};
+const updateServings = function(newServings) {
+    state.recipe.ingredients.forEach((ing)=>{
+        ing.quantity = ing.quantity * newServings / state.recipe.servings;
+    // newQt = oldQt * newServings / oldServings 
+    // 2 * (8 / 4) = 4 (new quantity)
+    });
+    state.recipe.servings = newServings;
+};
 
 },{"./config":"k5Hzs","./helpers":"hGI1E","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"k5Hzs":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
@@ -2710,6 +2728,16 @@ class RecipeView extends (0, _viewDefault.default) {
     // window.addEventListener('hashchange', controlRecipes);
     // window.addEventListener('load', controlRecipes);
     }
+    addHandlerUpdateServings(handler) {
+        this._parentElement.addEventListener("click", function(e) {
+            const btn = e.target.closest(".btn--update-servings");
+            if (!btn) return;
+            console.log(btn);
+            const updateTo = +btn.dataset.updateTo;
+            console.log(updateTo);
+            if (updateTo > 0) handler(updateTo);
+        });
+    }
     _generateMarkup() {
         return `
           <figure class="recipe__fig">
@@ -2735,12 +2763,12 @@ class RecipeView extends (0, _viewDefault.default) {
               <span class="recipe__info-text">servings</span>
 
               <div class="recipe__info-buttons">
-                <button class="btn--tiny btn--increase-servings">
+                <button class="btn--tiny btn--update-servings" data-update-to="${this._data.servings - 1}">
                   <svg>
                     <use href="${0, _iconsSvgDefault.default}#icon-minus-circle"></use>
                   </svg>
                 </button>
-                <button class="btn--tiny btn--increase-servings">
+                <button class="btn--tiny btn--update-servings" data-update-to="${this._data.servings + 1}">
                   <svg>
                     <use href="${0, _iconsSvgDefault.default}#icon-plus-circle"></use>
                   </svg>
@@ -3105,6 +3133,28 @@ class View {
         this._clear();
         this._parentElement.insertAdjacentHTML("afterbegin", markup);
     }
+    update(data) {
+        // if(!data || (Array.isArray(data) && data.length === 0)) 
+        // return this.renderError();
+        this._data = data;
+        const newMarkup = this._generateMarkup();
+        const newDOM = document.createRange().createContextualFragment(newMarkup);
+        const newElements = Array.from(newDOM.querySelectorAll("*"));
+        const curElements = Array.from(this._parentElement.querySelectorAll("*"));
+        // console.log(newElements);
+        // console.log(curElements);
+        newElements.forEach((newEl, i)=>{
+            const curEl = curElements[i];
+            // console.log(curEl, newEl.isEqualNode(curEl));
+            // Update changed Text
+            if (!newEl.isEqualNode(curEl) && newEl.firstChild?.nodeValue.trim() !== "") // console.log('HERE', newEl.firstChild?.nodeValue.trim())
+            curEl.textContent = newEl.textContent;
+            // Update changed attributes
+            if (!newEl.isEqualNode(curEl)) // console.log(newEl.attributes);
+            // console.log(Array.from(newEl.attributes));
+            Array.from(newEl.attributes).forEach((attr)=>curEl.setAttribute(attr.name, attr.value));
+        });
+    }
     _clear() {
         this._parentElement.innerHTML = "";
     }
@@ -3188,9 +3238,10 @@ class ResultsView extends (0, _viewDefault.default) {
         return this._data.map(this._generateMarkupPreview).join("");
     }
     _generateMarkupPreview(result) {
+        const id = window.location.hash.slice(1);
         return `
         <li class="preview">
-          <a class="preview__link" href="#${result.id}">
+          <a class="preview__link ${result.id === id ? "preview__link--active" : ""}"  href="#${result.id}">
             <figure class="preview__fig">
               <img src="${result.image}" alt="${result.title}" />
             </figure>

@@ -67,6 +67,8 @@ export const loadSearchResults = async function(query){
     }
 };
 
+// loadSearchResults('pizza'); //Testing function
+
 export const getSearchResultsPage = function(page = state.search.page) {
 
     state.search.page = page;
@@ -77,4 +79,12 @@ export const getSearchResultsPage = function(page = state.search.page) {
     return state.search.results.slice(start, end)
 }
 
-// loadSearchResults('pizza'); //Testing function
+export const updateServings = function(newServings) {
+    state.recipe.ingredients.forEach(ing => {
+        ing.quantity = ing.quantity * newServings / state.recipe.servings;
+        // newQt = oldQt * newServings / oldServings 
+        // 2 * (8 / 4) = 4 (new quantity)
+    });
+
+    state.recipe.servings = newServings;
+}
