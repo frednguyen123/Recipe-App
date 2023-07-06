@@ -682,6 +682,10 @@ const controlAddRecipe = async function(newRecipe) {
         (0, _recipeViewDefault.default).render(_model.state.recipe);
         // Success Message 
         (0, _addRecipeViewDefault.default).renderMessage();
+        // Render Bookmark View
+        (0, _bookmarksViewDefault.default).render(_model.state.bookmarks);
+        // Change ID in URL
+        window.history.pushState(null, "", `#${_model.state.recipe.id}`);
         // Close form window
         setTimeout(function() {
             (0, _addRecipeViewDefault.default).toggleWindow();
@@ -2056,7 +2060,7 @@ const createRecipeObject = function(data) {
 };
 const loadRecipe = async function(id) {
     try {
-        const data = await (0, _helpers.getJSON)(`${(0, _config.API_URL)}${id}`);
+        const data = await (0, _helpers.getJSON)(`${(0, _config.API_URL)}${id}?key=${(0, _config.KEY)}`);
         // const res = await fetch(`${API_URL}/${id}`);
         // // const res = await fetch(`https://forkify-api.herokuapp.com/api/v2/recipes/5ed6604691c37cdc054bd0d4`);
         // const data = await res.json();
@@ -2075,14 +2079,17 @@ const loadRecipe = async function(id) {
 const loadSearchResults = async function(query) {
     try {
         state.search.query = query;
-        const data = await (0, _helpers.getJSON)(`${(0, _config.API_URL)}?search=${query}`);
+        const data = await (0, _helpers.getJSON)(`${(0, _config.API_URL)}?search=${query}&key=${(0, _config.KEY)}`);
         console.log(data);
         state.search.results = data.data.recipes.map((rec)=>{
             return {
                 id: rec.id,
                 title: rec.title,
                 publisher: rec.publisher,
-                image: rec.image_url
+                image: rec.image_url,
+                ...rec.key && {
+                    key: rec.key
+                }
             };
         });
         state.search.page = 1;
@@ -2136,7 +2143,8 @@ const clearBookmarks = function() {
 const uploadRecipe = async function(newRecipe) {
     try {
         const ingredients = Object.entries(newRecipe).filter((entry)=>entry[0].startsWith("ingredient") && entry[1] !== "").map((ing)=>{
-            const ingArr = ing[1].replaceAll(" ", "").split(",");
+            const ingArr = ing[1].split(",").map((el)=>el.trim());
+            // const ingArr = ing[1].replaceAll(' ','').split(',');
             if (ingArr.length !== 3) throw new Error("Wrong ingredient format! Please use the correct format");
             const [quantity, unit, description] = ingArr;
             return {
@@ -2921,7 +2929,10 @@ class RecipeView extends (0, _viewDefault.default) {
               </div>
             </div>
 
-            <div class="recipe__user-generated">
+            <div class="recipe__user-generated ${this._data.key ? "" : "hidden"}">
+              <svg>
+                <use href="${0, _iconsSvgDefault.default}#icon-user"></use>
+              </svg>
             </div>
             <button class="btn--round btn--bookmark">
               <svg class="">
@@ -3271,7 +3282,15 @@ var _iconsSvg = require("url:../../img/icons.svg"); //Parcel 2
 var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
 class View {
     _data;
-    render(data, render = true) {
+    /**
+     * Render the recieved object to the DOM
+     * @param {Object | Objectp[]} data The data to be rendered (e.g recipe)
+     * @param {boolean} [render = true] If false, create markup string instead of rendering to the DOM
+     * @returns {undefined | string} A markup string is returned if render = false
+     * @this {Object} View instance
+     * @author Frederick Nguyen 
+     * @todo Finished Implementation
+     */ render(data, render = true) {
         if (!data || Array.isArray(data) && data.length === 0) return this.renderError();
         this._data = data;
         const markup = this._generateMarkup();
@@ -3408,6 +3427,11 @@ class PreviewView extends (0, _viewDefault.default) {
             <div class="preview__data">
               <h4 class="preview__title">${this._data.title}</h4>
               <p class="preview__publisher">${this._data.publisher}</p>
+              <div class="preview__user-generated ${this._data.key ? "" : "hidden"}">
+                <svg>
+                  <use href="${0, _iconsSvgDefault.default}#icon-user"></use>
+                </svg>
+              </div>
             </div>
           </a>
         </li>
